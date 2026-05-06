@@ -1,0 +1,942 @@
+<html lang="pt-BR"><head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ClickBus Flow Prototype</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&amp;display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            background-color: #E5E7EB; /* Desktop background */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+
+        /* Hide scrollbar for Chrome, Safari and Opera */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        /* Hide scrollbar for IE, Edge and Firefox */
+        .no-scrollbar {
+            -ms-overflow-style: none;  /* IE and Edge */
+            scrollbar-width: none;  /* Firefox */
+        }
+
+        .phone-frame {
+            width: 100%;
+            max-width: 390px;
+            height: 844px;
+            background-color: #F5F0FF;
+            position: relative;
+            overflow: hidden;
+            border-radius: 40px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            border: 8px solid #1A0B2E;
+            display: flex;
+            flex-direction: column;
+        }
+
+        @media (max-width: 430px) {
+            body { padding: 0; background-color: #F5F0FF; }
+            .phone-frame { max-width: 100%; height: 100vh; border-radius: 0; border: none; box-shadow: none; }
+        }
+
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #F5F0FF;
+            display: flex;
+            flex-direction: column;
+            transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1), transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            opacity: 0;
+            pointer-events: none;
+            transform: translateX(10px);
+            z-index: 10;
+        }
+
+        .screen.active {
+            opacity: 1;
+            pointer-events: auto;
+            transform: translateX(0);
+            z-index: 20;
+        }
+
+        .shadow-purple-soft {
+            box-shadow: 0 8px 30px rgba(107, 47, 186, 0.12);
+        }
+
+        /* Animations */
+        @keyframes pulse-ring {
+            0% { transform: scale(0.8); opacity: 0.5; }
+            100% { transform: scale(1.3); opacity: 0; }
+        }
+        .animate-pulse-ring::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 50%;
+            border: 2px solid #6B2FBA;
+            animation: pulse-ring 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+        }
+
+        @keyframes scan-line {
+            0% { top: 0; opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { top: 100%; opacity: 0; }
+        }
+        .scanner-line {
+            position: absolute;
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #FFD60A, transparent);
+            box-shadow: 0 0 10px #FFD60A;
+            animation: scan-line 2.5s ease-in-out infinite;
+        }
+
+        @keyframes slide-up {
+            from { transform: translateY(100%); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        .animate-slide-up {
+            animation: slide-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+        .animate-float {
+            animation: float 3s ease-in-out infinite;
+        }
+
+        /* AR Perspective */
+        .ar-perspective {
+            perspective: 800px;
+        }
+        .ar-arrow {
+            transform: rotateX(60deg);
+            filter: drop-shadow(0 0 10px rgba(107, 47, 186, 0.8));
+        }
+
+        /* Toggle Switch */
+        .toggle-checkbox:checked { right: 0; border-color: #6B2FBA; }
+        .toggle-checkbox:checked + .toggle-label { background-color: #6B2FBA; }
+        .toggle-checkbox:checked + .toggle-label:after { transform: translateX(100%); border-color: white; }
+    </style>
+</head>
+<body class="text-[#1A0B2E]">
+
+    <div class="phone-frame">
+        
+        <!-- Status Bar Simulator -->
+        <div class="h-12 w-full flex justify-between items-center px-6 pt-2 pb-1 z-50 absolute top-0 left-0 text-[#1A0B2E]" id="status-bar">
+            <span class="text-xs font-medium tracking-tight">9:41</span>
+            <div class="flex gap-1 items-center">
+                <iconify-icon icon="solar:cellular-linear" width="16"></iconify-icon>
+                <iconify-icon icon="solar:wi-fi-linear" width="16"></iconify-icon>
+                <iconify-icon icon="solar:battery-charge-linear" width="16"></iconify-icon>
+            </div>
+        </div>
+
+        <!-- APP CONTENT -->
+        <div class="flex-1 relative w-full h-full">
+
+            <!-- SCREEN 1: HOME -->
+            <div id="screen-home" class="screen active overflow-y-auto no-scrollbar pt-14 pb-24">
+                <!-- Header -->
+                <div class="px-6 py-4 flex justify-between items-center">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full bg-[#3D1A6B] flex justify-center items-center text-white font-medium text-sm">
+                            LS
+                        </div>
+                        <div>
+                            <p class="text-xs text-gray-500">Bom dia,</p>
+                            <h1 class="text-lg font-semibold tracking-tight">Lucas Silva</h1>
+                        </div>
+                    </div>
+                    <div class="bg-white px-3 py-1.5 rounded-full shadow-sm flex items-center gap-1">
+                        <iconify-icon icon="solar:star-fall-linear" class="text-[#FFD60A]"></iconify-icon>
+                        <span class="text-xs font-semibold text-[#6B2FBA]">2.480 pts</span>
+                    </div>
+                </div>
+
+                <!-- Next Trip Hero Card -->
+                <div class="px-6 mt-2">
+                    <div class="bg-gradient-to-br from-[#6B2FBA] to-[#3D1A6B] rounded-3xl p-6 text-white shadow-purple-soft relative overflow-hidden">
+                        <!-- BG pattern -->
+                        <div class="absolute -right-10 -top-10 opacity-10">
+                            <iconify-icon icon="solar:bus-linear" width="120"></iconify-icon>
+                        </div>
+                        
+                        <div class="flex justify-between items-start mb-6 relative z-10">
+                            <span class="bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-xs font-medium">Hoje, 14:30</span>
+                            <span class="text-xs font-medium opacity-80">Viação Cometa</span>
+                        </div>
+                        
+                        <div class="flex items-center gap-4 mb-8 relative z-10">
+                            <div class="flex flex-col">
+                                <span class="text-2xl font-semibold tracking-tight">SPO</span>
+                                <span class="text-xs opacity-70">Tietê</span>
+                            </div>
+                            <div class="flex-1 flex items-center gap-2">
+                                <div class="h-[1px] bg-white/30 flex-1"></div>
+                                <iconify-icon icon="solar:routing-linear" class="text-[#FFD60A]" width="20"></iconify-icon>
+                                <div class="h-[1px] bg-white/30 flex-1"></div>
+                            </div>
+                            <div class="flex flex-col text-right">
+                                <span class="text-2xl font-semibold tracking-tight">RIO</span>
+                                <span class="text-xs opacity-70">Novo Rio</span>
+                            </div>
+                        </div>
+
+                        <button onclick="navTo('screen-departure')" class="w-full bg-[#FFD60A] text-[#1A0B2E] py-3.5 rounded-2xl font-semibold text-sm flex justify-center items-center gap-2 active:scale-95 transition-transform">
+                            Iniciar Jornada Inteligente
+                            <iconify-icon icon="solar:arrow-right-linear"></iconify-icon>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Quick Actions -->
+                <div class="px-6 mt-8">
+                    <h2 class="text-sm font-semibold tracking-tight mb-4">Acesso Rápido</h2>
+                    <div class="grid grid-cols-3 gap-4">
+                        <div class="bg-white rounded-2xl p-4 flex flex-col items-center gap-2 shadow-sm border border-gray-100 active:bg-gray-50">
+                            <div class="w-10 h-10 rounded-full bg-[#F5F0FF] flex justify-center items-center text-[#6B2FBA]">
+                                <iconify-icon icon="solar:ticket-linear" width="20"></iconify-icon>
+                            </div>
+                            <span class="text-xs font-medium text-center">Comprar<br>Passagem</span>
+                        </div>
+                        <div class="bg-white rounded-2xl p-4 flex flex-col items-center gap-2 shadow-sm border border-gray-100 active:bg-gray-50">
+                            <div class="w-10 h-10 rounded-full bg-[#F5F0FF] flex justify-center items-center text-[#6B2FBA]">
+                                <iconify-icon icon="solar:bus-linear" width="20"></iconify-icon>
+                            </div>
+                            <span class="text-xs font-medium text-center">Minhas<br>Viagens</span>
+                        </div>
+                        <div class="bg-white rounded-2xl p-4 flex flex-col items-center gap-2 shadow-sm border border-gray-100 active:bg-gray-50">
+                            <div class="w-10 h-10 rounded-full bg-[#F5F0FF] flex justify-center items-center text-[#6B2FBA]">
+                                <iconify-icon icon="solar:chat-round-line-linear" width="20"></iconify-icon>
+                            </div>
+                            <span class="text-xs font-medium text-center">Ajuda &amp;<br>Suporte</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Suggestions -->
+                <div class="px-6 mt-8">
+                    <h2 class="text-sm font-semibold tracking-tight mb-4">Para sua viagem</h2>
+                    <div class="bg-white rounded-2xl p-4 flex items-center gap-4 shadow-sm border border-gray-100">
+                        <div class="w-12 h-12 rounded-xl bg-blue-50 flex justify-center items-center text-blue-500">
+                            <iconify-icon icon="solar:shield-warning-linear" width="24"></iconify-icon>
+                        </div>
+                        <div class="flex-1">
+                            <h3 class="text-xs font-semibold">Seguro Viagem</h3>
+                            <p class="text-xs text-gray-500 mt-0.5">Adicione proteção extra à sua jornada.</p>
+                        </div>
+                        <iconify-icon icon="solar:alt-arrow-right-linear" class="text-gray-400"></iconify-icon>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SCREEN 2: SMART DEPARTURE -->
+            <div id="screen-departure" class="screen bg-white overflow-y-auto no-scrollbar pt-14 pb-24">
+                <div class="px-6 py-2 flex items-center gap-4">
+                    <button onclick="navTo('screen-home')" class="w-10 h-10 rounded-full bg-gray-50 flex justify-center items-center active:bg-gray-100">
+                        <iconify-icon icon="solar:alt-arrow-left-linear" width="20"></iconify-icon>
+                    </button>
+                    <h1 class="text-base font-semibold tracking-tight">Saída Inteligente</h1>
+                </div>
+
+                <!-- Map snippet simulation -->
+                <div class="w-full h-48 bg-gray-100 relative mt-4">
+                    <img src="https://images.unsplash.com/photo-1524661135-423995f22d0b?auto=format&amp;fit=crop&amp;q=80&amp;w=600&amp;h=300" class="w-full h-full object-cover opacity-50 grayscale mix-blend-multiply" alt="Map">
+                    <!-- Route Line overlay -->
+                    <svg class="absolute top-0 left-0 w-full h-full pointer-events-none" viewBox="0 0 390 200">
+                        <path d="M50,150 Q150,100 200,80 T350,50" fill="none" stroke="#6B2FBA" stroke-width="4" stroke-dasharray="8 4" class="animate-pulse"></path>
+                        <circle cx="50" cy="150" r="6" fill="#1A0B2E"></circle>
+                        <circle cx="350" cy="50" r="8" fill="#6B2FBA"></circle>
+                    </svg>
+                    <!-- Notification Overlay -->
+                    <div class="absolute top-4 left-4 right-4 bg-[#1A0B2E] text-white p-3 rounded-2xl flex items-center gap-3 shadow-lg animate-slide-up">
+                        <iconify-icon icon="solar:bell-bing-linear" class="text-[#FFD60A]" width="20"></iconify-icon>
+                        <p class="text-xs font-medium">Trânsito leve. Saia em 5 min para chegar com folga.</p>
+                    </div>
+                </div>
+
+                <div class="px-6 -mt-6 relative z-10">
+                    <div class="bg-white rounded-3xl p-6 shadow-purple-soft border border-gray-50 text-center">
+                        <p class="text-xs text-gray-500 font-medium mb-1">Hora ideal para sair</p>
+                        <h2 class="text-4xl font-semibold tracking-tight text-[#6B2FBA]">13:15</h2>
+                        
+                        <div class="flex justify-between items-center mt-6 pt-6 border-t border-gray-100">
+                            <div class="text-left">
+                                <p class="text-xs text-gray-500">Trajeto (Carro)</p>
+                                <p class="text-sm font-semibold">45 min</p>
+                            </div>
+                            <div class="text-center">
+                                <p class="text-xs text-gray-500">Fila Terminal</p>
+                                <p class="text-sm font-semibold text-[#F59E0B]">Alta (12m)</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-xs text-gray-500">Margem Seg.</p>
+                                <p class="text-sm font-semibold text-[#10B981]">+ 15 min</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="px-6 mt-8">
+                    <h3 class="text-sm font-semibold tracking-tight mb-4">Como deseja ir?</h3>
+                    <div class="flex gap-4">
+                        <button class="flex-1 bg-black text-white rounded-2xl py-3 flex flex-col items-center justify-center gap-1 active:scale-95 transition-transform">
+                            <span class="text-sm font-semibold">Uber</span>
+                            <span class="text-xs opacity-70">~ R$ 42,00</span>
+                        </button>
+                        <button class="flex-1 bg-[#FFD60A] text-black rounded-2xl py-3 flex flex-col items-center justify-center gap-1 active:scale-95 transition-transform">
+                            <span class="text-sm font-semibold">99 Pop</span>
+                            <span class="text-xs opacity-70">~ R$ 38,50</span>
+                        </button>
+                    </div>
+                    <button class="w-full mt-3 bg-gray-50 text-[#1A0B2E] border border-gray-200 rounded-2xl py-3 flex justify-center items-center gap-2 active:bg-gray-100 transition-colors">
+                        <iconify-icon icon="solar:bus-linear"></iconify-icon>
+                        <span class="text-xs font-semibold">Transporte Público (Metrô)</span>
+                    </button>
+                </div>
+
+                <!-- Simulation Trigger -->
+                <div class="px-6 mt-10">
+                     <button onclick="triggerCheckIn()" class="w-full border-2 border-dashed border-[#6B2FBA] text-[#6B2FBA] py-3 rounded-2xl text-xs font-medium hover:bg-[#F5F0FF] transition-colors">
+                        [Simular Chegada ao Terminal]
+                    </button>
+                </div>
+            </div>
+
+            <!-- CHECK-IN OVERLAY (Triggered from Departure) -->
+            <div id="overlay-checkin" class="absolute inset-0 bg-[#1A0B2E]/80 backdrop-blur-sm z-50 hidden flex flex-col justify-center items-center px-6 transition-opacity opacity-0 duration-300">
+                <div class="bg-white w-full rounded-[32px] p-8 text-center transform scale-95 transition-transform duration-500" id="checkin-card">
+                    <div class="w-20 h-20 bg-[#F5F0FF] rounded-full mx-auto flex justify-center items-center text-[#6B2FBA] mb-6 relative animate-pulse-ring">
+                        <iconify-icon icon="solar:map-point-wave-linear" width="40"></iconify-icon>
+                    </div>
+                    <h2 class="text-xl font-semibold tracking-tight mb-2">Bem-vindo ao Terminal Tietê!</h2>
+                    <p class="text-sm text-gray-500 mb-8">Fizemos seu check-in automático. Seu ônibus está a caminho da plataforma.</p>
+                    
+                    <div class="bg-gray-50 rounded-2xl p-4 mb-8 flex justify-between items-center text-left">
+                        <div>
+                            <p class="text-xs text-gray-500 mb-1">Plataforma Confirmada</p>
+                            <p class="text-2xl font-semibold text-[#6B2FBA]">18</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-xs text-gray-500 mb-1">Status</p>
+                            <p class="text-xs font-semibold text-[#10B981] flex items-center gap-1 justify-end">
+                                <iconify-icon icon="solar:check-circle-linear"></iconify-icon> No horário
+                            </p>
+                        </div>
+                    </div>
+
+                    <button onclick="navToAR()" class="w-full bg-[#6B2FBA] text-white py-4 rounded-2xl font-semibold text-sm flex justify-center items-center gap-2 active:scale-95 transition-transform shadow-purple-soft">
+                        <iconify-icon icon="solar:augmented-reality-linear" width="20"></iconify-icon>
+                        Abrir Navegação AR
+                    </button>
+                    <button onclick="closeCheckIn()" class="mt-4 text-xs font-medium text-gray-400 p-2">Fechar</button>
+                </div>
+            </div>
+
+            <!-- SCREEN 4: AR WAYFINDING (WOW) -->
+            <div id="screen-ar" class="screen bg-black overflow-hidden relative">
+                <!-- Camera Background Simulation -->
+                <img src="https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?auto=format&amp;fit=crop&amp;q=80&amp;w=800&amp;h=1200" class="absolute inset-0 w-full h-full object-cover opacity-80" alt="Terminal Background">
+                
+                <!-- Bottom Gradient for UI readability -->
+                <div class="absolute bottom-0 left-0 w-full h-1/2 bg-gradient-to-t from-black via-black/60 to-transparent"></div>
+                <div class="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-black/80 to-transparent"></div>
+
+                <!-- AR Elements (CSS Perspective) -->
+                <div class="absolute inset-0 ar-perspective flex justify-center items-end pb-40 pointer-events-none">
+                    <div class="flex flex-col items-center gap-12 animate-float">
+                        <iconify-icon icon="solar:alt-arrow-up-linear" class="text-[#6B2FBA] ar-arrow opacity-40" width="80"></iconify-icon>
+                        <iconify-icon icon="solar:alt-arrow-up-linear" class="text-[#6B2FBA] ar-arrow opacity-70" width="100"></iconify-icon>
+                        <iconify-icon icon="solar:alt-arrow-up-linear" class="text-[#FFD60A] ar-arrow" width="120"></iconify-icon>
+                    </div>
+                </div>
+
+                <!-- Floating POI Markers -->
+                <div class="absolute top-[40%] left-[20%] bg-white/10 backdrop-blur-md border border-white/20 text-white px-3 py-1.5 rounded-full flex items-center gap-2 text-xs font-medium">
+                    <iconify-icon icon="solar:cup-hot-linear"></iconify-icon> Café (20m)
+                </div>
+
+                <!-- Top UI -->
+                <div class="absolute top-0 w-full px-6 pt-12 pb-4 flex justify-between items-start z-10">
+                    <button onclick="navTo('screen-home')" class="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md flex justify-center items-center text-white active:scale-95">
+                        <iconify-icon icon="solar:close-circle-linear" width="24"></iconify-icon>
+                    </button>
+                    <div class="bg-[#6B2FBA] text-white px-5 py-2.5 rounded-full flex flex-col items-center shadow-purple-soft">
+                        <span class="text-[10px] uppercase tracking-wider opacity-80 font-medium">Siga em frente</span>
+                        <span class="text-base font-semibold tracking-tight">42m até Plat. 18</span>
+                    </div>
+                    <button class="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md flex justify-center items-center text-white active:scale-95">
+                        <iconify-icon icon="solar:volume-loud-linear" width="20"></iconify-icon>
+                    </button>
+                </div>
+
+                <!-- Bottom UI -->
+                <div class="absolute bottom-6 w-full px-6 z-10 flex gap-4 items-end">
+                    <!-- Minimap -->
+                    <div class="w-24 h-32 bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl overflow-hidden relative">
+                        <div class="absolute inset-0 flex justify-center items-center">
+                            <div class="w-1 h-20 bg-gray-500 rounded-full"></div>
+                            <div class="w-1 h-10 bg-[#6B2FBA] rounded-full absolute bottom-6"></div>
+                            <div class="w-3 h-3 bg-[#FFD60A] rounded-full absolute bottom-[40px] shadow-[0_0_10px_#FFD60A]"></div>
+                        </div>
+                    </div>
+                    
+                    <button onclick="navTo('screen-twin')" class="flex-1 bg-white text-[#1A0B2E] py-4 rounded-2xl font-semibold text-sm flex justify-center items-center gap-2 active:scale-95 transition-transform shadow-lg">
+                        Cheguei na Plataforma
+                        <iconify-icon icon="solar:check-read-linear"></iconify-icon>
+                    </button>
+                </div>
+            </div>
+
+            <!-- SCREEN 5: DIGITAL TWIN / PLATFORM -->
+            <div id="screen-twin" class="screen bg-[#F5F0FF] overflow-y-auto no-scrollbar pt-14 pb-24">
+                <div class="px-6 py-2 flex items-center gap-4">
+                    <button onclick="navTo('screen-ar')" class="w-10 h-10 rounded-full bg-white flex justify-center items-center shadow-sm active:scale-95">
+                        <iconify-icon icon="solar:alt-arrow-left-linear" width="20"></iconify-icon>
+                    </button>
+                    <h1 class="text-base font-semibold tracking-tight">Plataforma 18</h1>
+                </div>
+
+                <!-- Isometric Map Simulation -->
+                <div class="px-6 mt-4 flex flex-col gap-6">
+                    <div class="self-end bg-white/80 backdrop-blur-md px-3 py-1.5 rounded-full shadow-sm flex items-center gap-2 text-xs font-medium">
+                        <span class="w-2 h-2 rounded-full bg-[#10B981] animate-pulse"></span> Ônibus estacionando
+                    </div>
+
+                    <div class="relative w-full h-44">
+                        <!-- Floor -->
+                        <div class="absolute inset-0 bg-white border border-gray-200 rounded-3xl shadow-sm"></div>
+
+                        <!-- Platform Area -->
+                        <div class="absolute top-1/2 left-1/2 w-28 h-20 bg-[#F5F0FF] border-2 border-[#6B2FBA] border-dashed rounded-xl flex justify-center items-center transform -translate-x-1/2 -translate-y-1/2">
+                            <span class="text-[#6B2FBA] font-semibold text-xl">18</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="px-6 mt-6 relative z-10">
+                    <div class="bg-white rounded-3xl p-6 shadow-sm border border-gray-50 mb-6">
+                        <h3 class="text-sm font-semibold tracking-tight mb-4">Serviços Próximos</h3>
+                        <div class="space-y-4">
+                            <div class="flex items-center gap-4">
+                                <div class="w-10 h-10 rounded-xl bg-orange-50 flex justify-center items-center text-orange-500">
+                                    <iconify-icon icon="solar:cup-hot-linear" width="20"></iconify-icon>
+                                </div>
+                                <div class="flex-1">
+                                    <h4 class="text-xs font-semibold">Casa do Pão de Queijo</h4>
+                                    <p class="text-[10px] text-gray-500">Aberto • Lotação baixa</p>
+                                </div>
+                                <span class="text-xs font-medium text-gray-400">1 min</span>
+                            </div>
+                            <div class="flex items-center gap-4">
+                                <div class="w-10 h-10 rounded-xl bg-blue-50 flex justify-center items-center text-blue-500">
+                                    <iconify-icon icon="solar:men-linear" width="20"></iconify-icon>
+                                </div>
+                                <div class="flex-1">
+                                    <h4 class="text-xs font-semibold">Banheiros</h4>
+                                    <p class="text-[10px] text-gray-500">Limpeza há 10 min</p>
+                                </div>
+                                <span class="text-xs font-medium text-gray-400">2 min</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button onclick="navTo('screen-faceid')" class="w-full bg-gradient-to-r from-[#6B2FBA] to-[#3D1A6B] text-white py-4 rounded-2xl font-semibold text-sm flex justify-center items-center gap-2 active:scale-95 transition-transform shadow-purple-soft">
+                        <iconify-icon icon="solar:face-scan-circle-linear" width="24"></iconify-icon>
+                        Embarque Facial
+                    </button>
+                    <button onclick="navTo('screen-nfc')" class="w-full mt-3 bg-white text-[#1A0B2E] border border-gray-200 py-4 rounded-2xl font-semibold text-sm flex justify-center items-center gap-2 active:scale-95 transition-transform shadow-sm">
+                        <iconify-icon icon="solar:smartphone-linear" width="22"></iconify-icon>
+                        Embarque por NFC
+                    </button>
+                    <p class="text-center text-[10px] text-gray-500 mt-3">Escolha facial ou NFC para embarcar sem bilhete impresso.</p>
+                </div>
+            </div>
+
+            <!-- SCREEN 6B: NFC BOARDING -->
+            <div id="screen-nfc" class="screen bg-[#F5F0FF] overflow-y-auto no-scrollbar pt-14 pb-24">
+                <div class="px-6 py-2 flex items-center gap-4">
+                    <button onclick="navTo('screen-twin')" class="w-10 h-10 rounded-full bg-white flex justify-center items-center shadow-sm active:scale-95">
+                        <iconify-icon icon="solar:alt-arrow-left-linear" width="20"></iconify-icon>
+                    </button>
+                    <h1 class="text-base font-semibold tracking-tight">Embarque por NFC</h1>
+                </div>
+
+                <div class="px-6 mt-6">
+                    <div class="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 text-center">
+                        <div class="w-24 h-24 mx-auto rounded-full bg-[#F5F0FF] flex items-center justify-center text-[#6B2FBA] relative animate-pulse-ring">
+                            <iconify-icon icon="solar:smartphone-linear" width="44"></iconify-icon>
+                        </div>
+                        <h2 class="text-lg font-semibold tracking-tight mt-5">Aproxime o celular do totem</h2>
+                        <p class="text-xs text-gray-500 mt-2">Mantenha o NFC ativo e encoste o topo do aparelho no leitor indicado.</p>
+
+                        <div class="mt-6 bg-gray-50 rounded-2xl p-4 text-left">
+                            <h3 class="text-xs font-semibold mb-3">Siga estas instruções no totem:</h3>
+                            <ol class="text-xs text-gray-600 space-y-2 list-decimal pl-4">
+                                <li>Confirme seu nome e destino na tela.</li>
+                                <li>Valide a viagem com um toque em "Autorizar".</li>
+                                <li>Aguarde o sinal verde para liberar a catraca.</li>
+                            </ol>
+                        </div>
+
+                        <button onclick="simulateNFC()" class="w-full mt-6 bg-[#6B2FBA] text-white py-3.5 rounded-2xl font-semibold text-sm flex justify-center items-center gap-2 active:scale-95 transition-transform">
+                            Simular leitura NFC no totem
+                            <iconify-icon icon="solar:check-read-linear"></iconify-icon>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SCREEN 6: FACIAL BOARDING -->
+            <div id="screen-faceid" class="screen bg-black overflow-hidden flex flex-col">
+                <div class="px-6 pt-14 pb-4 flex justify-between items-center z-10 absolute w-full">
+                    <button onclick="navTo('screen-twin')" class="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md flex justify-center items-center text-white active:scale-95">
+                        <iconify-icon icon="solar:close-circle-linear" width="24"></iconify-icon>
+                    </button>
+                    <span class="text-white text-sm font-medium">Embarque</span>
+                    <div class="w-10"></div>
+                </div>
+
+                <!-- Camera Viewfinder -->
+                <div class="flex-1 relative flex justify-center items-center" id="scan-area">
+                    <!-- Blurred background placeholder -->
+                    <div class="absolute inset-0 bg-[#3D1A6B] opacity-50"></div>
+                    <div class="absolute inset-0 flex justify-center items-center">
+                        <iconify-icon icon="solar:user-circle-linear" class="text-white/20" width="200"></iconify-icon>
+                    </div>
+
+                    <!-- Scanning Frame -->
+                    <div class="w-64 h-80 relative z-10" id="scan-frame">
+                        <!-- Corners -->
+                        <div class="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-[#6B2FBA] rounded-tl-2xl transition-colors duration-300"></div>
+                        <div class="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-[#6B2FBA] rounded-tr-2xl transition-colors duration-300"></div>
+                        <div class="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-[#6B2FBA] rounded-bl-2xl transition-colors duration-300"></div>
+                        <div class="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-[#6B2FBA] rounded-br-2xl transition-colors duration-300"></div>
+                        
+                        <div class="scanner-line"></div>
+                        
+                        <p class="absolute -bottom-12 w-full text-center text-white text-xs font-medium" id="scan-text">Buscando rosto...</p>
+                    </div>
+                </div>
+
+                <!-- Success Overlay (Hidden initially) -->
+                <div id="success-overlay" class="absolute inset-0 bg-[#10B981] z-20 flex flex-col justify-center items-center text-white hidden transition-opacity opacity-0 duration-500">
+                    <div class="w-24 h-24 bg-white/20 rounded-full flex justify-center items-center mb-6 scale-0 transition-transform duration-500 delay-200" id="success-icon">
+                        <iconify-icon icon="solar:check-circle-bold" width="60" class="text-white"></iconify-icon>
+                    </div>
+                    <h2 class="text-2xl font-semibold tracking-tight mb-2 opacity-0 transition-opacity duration-500 delay-300" id="success-title">Bem-vindo a bordo!</h2>
+                    <p class="text-sm opacity-80 mb-10 opacity-0 transition-opacity duration-500 delay-400" id="success-desc">Lucas Silva • Poltrona 12A</p>
+                    
+                    <!-- Ticket destroying animation sim -->
+                    <div class="w-48 h-16 bg-white/10 rounded-lg border border-white/30 flex items-center px-4 relative overflow-hidden opacity-0 transition-opacity duration-500 delay-500" id="ticket-anim">
+                        <iconify-icon icon="solar:ticket-linear" width="24" class="mr-3"></iconify-icon>
+                        <span class="text-xs font-medium">Ticket Digital Usado</span>
+                        <div class="absolute inset-0 bg-white/20 translate-x-[-100%] animate-[scan-line_1s_ease-in-out_forwards_1s]"></div>
+                    </div>
+
+                    <button onclick="navTo('screen-posttrip')" class="mt-12 bg-white text-[#10B981] px-8 py-3 rounded-full text-sm font-semibold opacity-0 transition-opacity duration-500 delay-700" id="success-btn">
+                        Ver Resumo
+                    </button>
+                </div>
+            </div>
+
+            <!-- SCREEN 7: ACCESSIBILITY -->
+            <div id="screen-a11y" class="screen bg-white overflow-y-auto no-scrollbar pt-14 pb-24">
+                <div class="px-6 py-2 flex items-center gap-4 border-b border-gray-100 pb-4">
+                    <h1 class="text-lg font-semibold tracking-tight flex-1">Acessibilidade</h1>
+                </div>
+
+                <div class="p-6 space-y-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 class="text-sm font-semibold">Alto Contraste</h3>
+                            <p class="text-xs text-gray-500 mt-1">Cores mais fortes para leitura</p>
+                        </div>
+                        <div class="relative inline-block w-12 mr-2 align-middle select-none transition duration-200 ease-in">
+                            <input type="checkbox" name="toggle" id="toggle-1" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer z-10 transition-transform duration-200 ease-in-out">
+                            <label for="toggle-1" class="toggle-label block overflow-hidden h-6 rounded-full bg-gray-200 cursor-pointer transition-colors duration-200 ease-in-out"></label>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 class="text-sm font-semibold">Rota para Cadeirantes</h3>
+                            <p class="text-xs text-gray-500 mt-1">Prioriza rampas e elevadores</p>
+                        </div>
+                        <div class="relative inline-block w-12 mr-2 align-middle select-none transition duration-200 ease-in">
+                            <input type="checkbox" name="toggle" id="toggle-2" checked="" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer z-10 transition-transform duration-200 ease-in-out">
+                            <label for="toggle-2" class="toggle-label block overflow-hidden h-6 rounded-full bg-[#6B2FBA] cursor-pointer transition-colors duration-200 ease-in-out"></label>
+                        </div>
+                    </div>
+
+                    <div class="bg-[#F5F0FF] rounded-2xl p-4 border border-[#6B2FBA]/20">
+                        <div class="flex items-center gap-3 mb-3">
+                            <div class="w-8 h-8 rounded-full bg-[#6B2FBA] text-white flex justify-center items-center">
+                                <iconify-icon icon="solar:volume-loud-linear"></iconify-icon>
+                            </div>
+                            <h3 class="text-sm font-semibold">Audiodescrição Ativa</h3>
+                        </div>
+                        <div class="h-1 bg-[#3D1A6B]/20 rounded-full w-full mb-2 relative">
+                            <div class="absolute left-0 h-full w-1/3 bg-[#6B2FBA] rounded-full"></div>
+                        </div>
+                        <p class="text-[10px] text-gray-500">"Siga reto por 10 metros, o banheiro estará à sua direita."</p>
+                    </div>
+
+                    <div class="pt-4 border-t border-gray-100">
+                        <button class="w-full bg-red-50 text-red-600 border border-red-100 py-4 rounded-2xl font-semibold text-sm flex justify-center items-center gap-2 active:scale-95 transition-transform">
+                            <iconify-icon icon="solar:danger-triangle-linear" width="20"></iconify-icon>
+                            Pedir Ajuda no Terminal (SOS)
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SCREEN 8: AI CONCIERGE -->
+            <div id="screen-chat" class="screen bg-[#F5F0FF] flex flex-col z-[30]">
+                <div class="px-6 pt-14 pb-4 flex items-center gap-4 bg-white/80 backdrop-blur-md border-b border-gray-100 shadow-sm relative z-10">
+                    <button onclick="closeChat()" class="w-8 h-8 rounded-full bg-gray-50 flex justify-center items-center active:bg-gray-100">
+                        <iconify-icon icon="solar:alt-arrow-down-linear"></iconify-icon>
+                    </button>
+                    <div class="flex items-center gap-2 flex-1">
+                        <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-[#6B2FBA] to-[#FFD60A] p-[2px]">
+                            <div class="w-full h-full bg-white rounded-full flex justify-center items-center text-[#6B2FBA]">
+                                <iconify-icon icon="solar:magic-stick-3-linear"></iconify-icon>
+                            </div>
+                        </div>
+                        <div>
+                            <h1 class="text-sm font-semibold tracking-tight">Concierge IA</h1>
+                            <p class="text-[10px] text-[#10B981] font-medium flex items-center gap-1">
+                                <span class="w-1.5 h-1.5 bg-[#10B981] rounded-full"></span> Online
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex-1 overflow-y-auto p-6 space-y-4 flex flex-col">
+                    <!-- Chat Bubbles -->
+                    <div class="flex gap-3 max-w-[85%]">
+                        <div class="w-6 h-6 rounded-full bg-white flex-shrink-0 flex justify-center items-center text-[#6B2FBA] shadow-sm">
+                            <iconify-icon icon="solar:magic-stick-3-linear" width="14"></iconify-icon>
+                        </div>
+                        <div class="bg-white p-3 rounded-2xl rounded-tl-none shadow-sm text-sm text-gray-700">
+                            Olá Lucas! Vejo que você está no Terminal Tietê. Como posso ajudar com seu embarque para o Rio?
+                        </div>
+                    </div>
+                    
+                    <div class="flex gap-3 max-w-[85%] self-end flex-row-reverse">
+                        <div class="bg-[#6B2FBA] p-3 rounded-2xl rounded-tr-none shadow-sm text-sm text-white">
+                            Onde tem um café bom por aqui?
+                        </div>
+                    </div>
+
+                    <div class="flex gap-3 max-w-[85%]">
+                        <div class="w-6 h-6 rounded-full bg-white flex-shrink-0 flex justify-center items-center text-[#6B2FBA] shadow-sm">
+                            <iconify-icon icon="solar:magic-stick-3-linear" width="14"></iconify-icon>
+                        </div>
+                        <div class="bg-white p-3 rounded-2xl rounded-tl-none shadow-sm text-sm text-gray-700">
+                            Tem a Casa do Pão de Queijo a 1 minuto da sua plataforma atual. Quer que eu trace a rota em AR?
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Input Area -->
+                <div class="p-4 bg-white border-t border-gray-100">
+                    <div class="flex gap-2 overflow-x-auto no-scrollbar mb-3 pb-1">
+                        <button class="flex-shrink-0 bg-gray-50 border border-gray-200 text-xs px-3 py-1.5 rounded-full text-gray-600">Banheiro perto?</button>
+                        <button class="flex-shrink-0 bg-gray-50 border border-gray-200 text-xs px-3 py-1.5 rounded-full text-gray-600">Atraso no ônibus?</button>
+                    </div>
+                    <div class="flex items-center gap-3 bg-gray-50 rounded-full px-4 py-2 border border-gray-200">
+                        <iconify-icon icon="solar:smile-circle-linear" class="text-gray-400" width="20"></iconify-icon>
+                        <input type="text" placeholder="Pergunte algo..." class="bg-transparent flex-1 outline-none text-sm text-[#1A0B2E] placeholder-gray-400">
+                        <button class="w-8 h-8 bg-[#6B2FBA] rounded-full flex justify-center items-center text-white">
+                            <iconify-icon icon="solar:microphone-linear" width="16"></iconify-icon>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SCREEN 9: POST TRIP -->
+            <div id="screen-posttrip" class="screen bg-white overflow-y-auto no-scrollbar pt-14 pb-24">
+                <div class="px-6 py-10 flex flex-col items-center text-center">
+                    <div class="w-16 h-16 bg-[#F5F0FF] rounded-full flex justify-center items-center text-[#6B2FBA] mb-4">
+                        <iconify-icon icon="solar:medal-star-linear" width="32"></iconify-icon>
+                    </div>
+                    <h1 class="text-2xl font-semibold tracking-tight mb-2">Jornada Concluída!</h1>
+                    <p class="text-sm text-gray-500 mb-8">Como foi sua experiência no terminal?</p>
+                    
+                    <div class="flex gap-2 mb-10">
+                        <iconify-icon icon="solar:star-bold" class="text-[#FFD60A]" width="36"></iconify-icon>
+                        <iconify-icon icon="solar:star-bold" class="text-[#FFD60A]" width="36"></iconify-icon>
+                        <iconify-icon icon="solar:star-bold" class="text-[#FFD60A]" width="36"></iconify-icon>
+                        <iconify-icon icon="solar:star-bold" class="text-[#FFD60A]" width="36"></iconify-icon>
+                        <iconify-icon icon="solar:star-linear" class="text-gray-300" width="36"></iconify-icon>
+                    </div>
+
+                    <div class="w-full bg-[#F5F0FF] rounded-3xl p-6 text-left border border-[#6B2FBA]/10">
+                        <h3 class="text-sm font-semibold mb-4">Seu impacto de tempo</h3>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="bg-white p-3 rounded-2xl shadow-sm">
+                                <iconify-icon icon="solar:clock-circle-linear" class="text-[#10B981] mb-1"></iconify-icon>
+                                <p class="text-xl font-semibold">12 min</p>
+                                <p class="text-[10px] text-gray-500">Economizados em filas</p>
+                            </div>
+                            <div class="bg-white p-3 rounded-2xl shadow-sm">
+                                <iconify-icon icon="solar:routing-linear" class="text-[#6B2FBA] mb-1"></iconify-icon>
+                                <p class="text-xl font-semibold">150m</p>
+                                <p class="text-[10px] text-gray-500">Caminhados sem erro</p>
+                            </div>
+                        </div>
+
+                        <div class="mt-4 bg-gradient-to-r from-[#6B2FBA] to-[#3D1A6B] p-4 rounded-2xl text-white flex justify-between items-center">
+                            <div>
+                                <p class="text-xs opacity-80">ClickPoints ganhos</p>
+                                <p class="text-lg font-semibold flex items-center gap-1">
+                                    +50 <iconify-icon icon="solar:star-fall-linear" class="text-[#FFD60A]" width="16"></iconify-icon>
+                                </p>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-[10px] opacity-80">Saldo Total</p>
+                                <p class="text-sm font-semibold">2.530</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button onclick="navTo('screen-home')" class="mt-8 text-sm font-medium text-[#6B2FBA]">Voltar ao Início</button>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- FLOATING AI BUTTON -->
+        <button onclick="navToChat()" class="absolute bottom-24 right-6 w-14 h-14 bg-[#1A0B2E] rounded-full shadow-lg flex justify-center items-center text-white z-[25] hover:scale-105 active:scale-95 transition-transform group border-2 border-[#1A0B2E]">
+            <div class="absolute inset-0 bg-gradient-to-tr from-[#6B2FBA] to-[#FFD60A] rounded-full opacity-0 group-hover:opacity-100 transition-opacity"></div>
+            <iconify-icon icon="solar:magic-stick-3-linear" width="24" class="relative z-10"></iconify-icon>
+        </button>
+
+        <!-- BOTTOM NAVIGATION -->
+        <div id="bottom-nav" class="h-20 bg-white/90 backdrop-blur-md border-t border-gray-100 absolute bottom-0 w-full z-20 flex justify-between items-center px-6 pb-4 pt-2 text-gray-400">
+            <button onclick="navTo('screen-home')" class="flex flex-col items-center gap-1 nav-btn active" data-target="screen-home">
+                <iconify-icon icon="solar:home-smile-linear" width="24" class="nav-icon"></iconify-icon>
+                <span class="text-[10px] font-medium nav-text">Início</span>
+            </button>
+            <button onclick="navTo('screen-departure')" class="flex flex-col items-center gap-1 nav-btn" data-target="screen-departure">
+                <iconify-icon icon="solar:map-point-wave-linear" width="24" class="nav-icon"></iconify-icon>
+                <span class="text-[10px] font-medium nav-text">Jornada</span>
+            </button>
+            <button class="flex flex-col items-center gap-1 nav-btn">
+                <iconify-icon icon="solar:wallet-linear" width="24" class="nav-icon"></iconify-icon>
+                <span class="text-[10px] font-medium nav-text">Carteira</span>
+            </button>
+            <button onclick="navTo('screen-a11y')" class="flex flex-col items-center gap-1 nav-btn" data-target="screen-a11y">
+                <iconify-icon icon="solar:accessibility-linear" width="24" class="nav-icon"></iconify-icon>
+                <span class="text-[10px] font-medium nav-text">Acesso</span>
+            </button>
+            <button class="flex flex-col items-center gap-1 nav-btn">
+                <iconify-icon icon="solar:user-circle-linear" width="24" class="nav-icon"></iconify-icon>
+                <span class="text-[10px] font-medium nav-text">Perfil</span>
+            </button>
+        </div>
+
+    </div>
+
+    <script>
+        // Store timeout IDs for async simulations
+        let faceScanTimeout;
+        let nfcTimeout;
+
+        // Navigation Logic
+        function navTo(screenId) {
+            // Hide all screens
+            document.querySelectorAll('.screen').forEach(s => {
+                s.classList.remove('active');
+            });
+            // Show target
+            document.getElementById(screenId).classList.add('active');
+
+            // Update bottom nav styling
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('text-[#6B2FBA]');
+                btn.querySelector('.nav-icon').setAttribute('icon', btn.querySelector('.nav-icon').getAttribute('icon').replace('-bold', '-linear'));
+            });
+
+            // Match nav button
+            const activeBtn = document.querySelector(`.nav-btn[data-target="${screenId}"]`);
+            if (activeBtn) {
+                activeBtn.classList.add('text-[#6B2FBA]');
+                const icon = activeBtn.querySelector('.nav-icon');
+                icon.setAttribute('icon', icon.getAttribute('icon').replace('-linear', '-bold'));
+            }
+
+            // Hide/Show bottom nav and status bar coloring based on screen
+            const bottomNav = document.getElementById('bottom-nav');
+            const shouldHideBottomNav = screenId === 'screen-ar';
+            bottomNav.style.display = shouldHideBottomNav ? 'none' : 'flex';
+            const isDarkScreen = screenId === 'screen-ar' || screenId === 'screen-faceid';
+            document.getElementById('status-bar').style.color = isDarkScreen ? 'white' : '#1A0B2E';
+            
+            // Auto Trigger Face Scan or Reset it
+            if (screenId === 'screen-faceid') {
+                const scanText = document.getElementById('scan-text');
+                scanText.innerText = "Analisando biometria...";
+                scanText.classList.add('animate-pulse');
+                
+                // Automatically run the success flow after 2.5 seconds
+                faceScanTimeout = setTimeout(() => {
+                    simulateScan();
+                }, 2500);
+            } else {
+                resetFaceID();
+            }
+        }
+
+        // Initialize first nav item
+        document.querySelector('.nav-btn[data-target="screen-home"]').classList.add('text-[#6B2FBA]');
+        document.querySelector('.nav-btn[data-target="screen-home"] .nav-icon').setAttribute('icon', 'solar:home-smile-bold');
+
+        // Specific Interactions
+        function triggerCheckIn() {
+            const overlay = document.getElementById('overlay-checkin');
+            const card = document.getElementById('checkin-card');
+            overlay.classList.remove('hidden');
+            // Slight delay for transition to kick in
+            setTimeout(() => {
+                overlay.classList.remove('opacity-0');
+                card.classList.remove('scale-95');
+                card.classList.add('scale-100');
+            }, 50);
+        }
+
+        function closeCheckIn() {
+            const overlay = document.getElementById('overlay-checkin');
+            const card = document.getElementById('checkin-card');
+            overlay.classList.add('opacity-0');
+            card.classList.remove('scale-100');
+            card.classList.add('scale-95');
+            setTimeout(() => {
+                overlay.classList.add('hidden');
+            }, 300);
+        }
+
+        function navToAR() {
+            closeCheckIn();
+            setTimeout(() => {
+                navTo('screen-ar');
+            }, 300);
+        }
+
+        function navToChat() {
+            const chat = document.getElementById('screen-chat');
+            chat.classList.remove('translate-y-full', 'hidden');
+            chat.classList.add('active');
+        }
+
+        function closeChat() {
+            document.getElementById('screen-chat').classList.remove('active');
+        }
+
+        // Face ID Simulation
+        function simulateScan() {
+            const frame = document.getElementById('scan-frame');
+            const text = document.getElementById('scan-text');
+            const borders = frame.querySelectorAll('div[class*="border-[#6B2FBA]"]');
+            
+            text.classList.remove('animate-pulse');
+            
+            // Change to green
+            borders.forEach(b => {
+                b.classList.remove('border-[#6B2FBA]');
+                b.classList.add('border-[#10B981]');
+            });
+            text.innerText = "Reconhecimento concluído!";
+            text.classList.remove('text-white');
+            text.classList.add('text-[#10B981]');
+
+            // Trigger Success Overlay
+            setTimeout(() => {
+                const overlay = document.getElementById('success-overlay');
+                overlay.classList.remove('hidden');
+                
+                // Animate sequence
+                setTimeout(() => {
+                    overlay.classList.remove('opacity-0');
+                    document.getElementById('success-icon').classList.remove('scale-0');
+                    document.getElementById('success-title').classList.remove('opacity-0');
+                    document.getElementById('success-desc').classList.remove('opacity-0');
+                    document.getElementById('ticket-anim').classList.remove('opacity-0');
+                    document.getElementById('success-btn').classList.remove('opacity-0');
+                }, 50);
+            }, 800);
+        }
+
+        function resetFaceID() {
+            clearTimeout(faceScanTimeout);
+            const overlay = document.getElementById('success-overlay');
+            overlay.classList.add('hidden', 'opacity-0');
+            
+            const frame = document.getElementById('scan-frame');
+            if(frame) {
+                const text = document.getElementById('scan-text');
+                text.classList.remove('animate-pulse');
+                
+                const borders = frame.querySelectorAll('div[class*="border-[#10B981]"]');
+                borders.forEach(b => {
+                    b.classList.remove('border-[#10B981]');
+                    b.classList.add('border-[#6B2FBA]');
+                });
+                text.innerText = "Buscando rosto...";
+                text.classList.remove('text-[#10B981]');
+                text.classList.add('text-white');
+
+                // Reset success elements
+                document.getElementById('success-icon').classList.add('scale-0');
+                document.getElementById('success-title').classList.add('opacity-0');
+                document.getElementById('success-desc').classList.add('opacity-0');
+                document.getElementById('ticket-anim').classList.add('opacity-0');
+                document.getElementById('success-btn').classList.add('opacity-0');
+            }
+        }
+
+        function simulateNFC() {
+            clearTimeout(nfcTimeout);
+            const btn = document.querySelector('#screen-nfc button[onclick="simulateNFC()"]');
+            if (!btn) return;
+
+            btn.disabled = true;
+            btn.classList.add('opacity-70');
+            btn.innerHTML = `
+                <iconify-icon icon="solar:refresh-linear" class="animate-spin" width="18"></iconify-icon>
+                Validando no totem...
+            `;
+
+            nfcTimeout = setTimeout(() => {
+                navTo('screen-posttrip');
+                btn.disabled = false;
+                btn.classList.remove('opacity-70');
+                btn.innerHTML = `
+                    Simular leitura NFC no totem
+                    <iconify-icon icon="solar:check-read-linear"></iconify-icon>
+                `;
+            }, 1800);
+        }
+    </script>
+
+</body></html>
